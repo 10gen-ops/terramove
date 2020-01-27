@@ -144,8 +144,15 @@ func generateTerraformImportsRun(cmd *cobra.Command, args []string) {
 				fmt.Printf("Error getting the resource instance id, %v", err)
 			}
 
+			// By default the `to` field is set to `from` as the first can be ommited
+			to := migration.From
+
+			if migration.To != "" {
+				to = migration.To
+			}
+
 			// Find the id
-			fmt.Printf("terraform import %q %q\n", absResource.String(), instanceId)
+			fmt.Printf("terraform import %q %q\n", to, instanceId)
 		}
 	}
 }
