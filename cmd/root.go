@@ -86,7 +86,6 @@ func initConfig() {
 	if err := viper.ReadInConfig(); err != nil {
 		panic(fmt.Errorf("Fatal error config file: %s \n", err))
 	}
-	fmt.Println("Using config file:", viper.ConfigFileUsed())
 
 	// If a config file is found, read it into terramoveConfig
 	if err := viper.Unmarshal(&config); err != nil {
