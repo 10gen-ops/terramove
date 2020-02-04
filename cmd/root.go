@@ -22,7 +22,6 @@ import (
 	"os"
 
 	"github.com/hashicorp/terraform/addrs"
-	"github.com/hashicorp/terraform/states"
 	"github.com/hashicorp/terraform/states/statefile"
 	homedir "github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
@@ -98,16 +97,16 @@ type InstanceAttributes struct {
 	Id string
 }
 
-func getResourceInstanceId(ri *states.ResourceInstance) (string, error) {
+func getInstanceAttributes(attrs []byte) (InstanceAttributes, error) {
 	iattrs := InstanceAttributes{}
 
-	jsonAttrs := ri.Current.AttrsJSON
-	err := json.Unmarshal(jsonAttrs, &iattrs)
+	err := json.Unmarshal(attrs, &iattrs)
 	if err != nil {
-		return "", err
+		return iattrs, err
 	}
 
-	return iattrs.Id, nil
+	return iattrs, nil
+
 }
 
 func generateTerraformImportsRun(cmd *cobra.Command, args []string) {
@@ -129,29 +128,24 @@ func generateTerraformImportsRun(cmd *cobra.Command, args []string) {
 
 	// Iterate over the "from" keys to get the ids on the source state
 	for _, migration := range config.Migrations {
-		absResource, _ := addrs.ParseAbsResourceStr(migration.From)
+		// ParseAbsREsourceInstanceSrt returns a tfdias.Diagnostics type of value that we don't need
+		// so we drop that
+		absResource, _ := addrs.ParseAbsResourceInstanceStr(migration.From)
+
+		currentResource := tfstate.State.ResourceInstance(absResource).Current
+
+		iattrs, err := getInstanceAttributes(currentResource.AttrsJSON)
 		if err != nil {
-			fmt.Printf("Error parsing resource %q, %v", migration.From, err)
+			fmt.Printf("Error getting instance attributes, %v", err)
 		}
 
-		resource := tfstate.State.Resource(absResource)
+		// By default the `to` field is set to `from` as the first can be omitted
+		to := migration.From
 
-		// Get instances of the resource
-		for _, resourceInstance := range resource.Instances {
-			instanceId, err := getResourceInstanceId(resourceInstance)
-			if err != nil {
-				fmt.Printf("Error getting the resource instance id, %v", err)
-			}
-
-			// By default the `to` field is set to `from` as the first can be omitted
-			to := migration.From
-
-			if migration.To != "" {
-				to = migration.To
-			}
-
-			// Find the id
-			fmt.Printf("terraform import %q %q\n", to, instanceId)
+		if migration.To != "" {
+			to = migration.To
 		}
+
+		fmt.Printf("terraform import %q %q\n", to, iattrs.Id)
 	}
 }
